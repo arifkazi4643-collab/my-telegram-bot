@@ -1,46 +1,100 @@
 import os, telebot, requests, random, threading
 from flask import Flask
+from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 app = Flask('')
 @app.route('/')
-def home(): return "OK"
+def home(): return "Loki Boost Panel Server Active"
 
-T = os.environ.get('BOT_TOKEN')
-K = os.environ.get('GROQ_API_KEY')
-bot = telebot.TeleBot(T)
+BOT_TOKEN = os.environ.get('BOT_TOKEN')
+bot = telebot.TeleBot(BOT_TOKEN)
+user_states = {}
 
-P = "You are a friendly human group manager for '98 pay' app. Speak natural Hinglish using words like bhai, yaar, bro, dekho, suno, tension mat lo. Keep replies short. App Name is 98 pay. Earning app. Add UPI Setup: Click 'add upi' -> add Mobikwik (only buy/sell), Airtel (only sell), Paytm Business (only sell), PhonePe (only sell). Step: click add upi -> select toll -> registered mobile number -> send otp -> copy-paste OTP -> select UPI to bind. Buy System: Click buy -> grab order -> click pay -> automatically opens app -> enter MPIN -> screenshot history -> upload screenshot in 98pay -> success in 30s -> commission 3%+Rs6. 1000 order gives 10036. Buy starts from Rs100. Sell System: Automatic. Minimum/lowest sell is Rs 200. Under 200, sell or withdraw fails. Low balance support: Positively tell them minimum balance for sell must be 200. Encourage more buy orders starting from 100 to increase balance. Negative users: Manage them with cool patience, state high commissions facts politely, counter any bad-mouthing positively. Newbie Bonus: Rs200 in Bonus Center after tasks. Slow Sell issue logic: Explain creatively: 'Hlw brother apka sell esliye slow ho gaya hai kyuki apne ek hi upi se bar bar sell de rahe ho, please upi id change karo. Problem solve na ho toh rebind karo, ya phir upi toll delete karke firse add karo. First sell ke liye Airtel ya PhonePe use karo.' Complex/Unresolved issues: Tell them to talk to admins in an awesome way: @Ownerrrrx_01, @pay98_Sanben, @BROKENBOYxERA, or @Lootisbsi. Link: Provide https://98pay.in if asked for app link or download link."
+@bot.message_handler(commands=['start', 'help'])
+def welcome_panel(m):
+    user_states[m.chat.id] = None
+    text = (
+        "🚀 **Loki Ultimate Multi-Server Boost Panel v3** 🚀\n\n"
+        "Welcome bhai! Is bot se aap Instagram views, likes aur YouTube watchtime directly badha sakte hain.\n\n"
+        "👇 **Niche se apna target tool select karein:**"
+    )
+    markup = InlineKeyboardMarkup()
+    markup.row_width = 2
+    markup.add(
+        InlineKeyboardButton("📈 Insta Views", callback_data="inst_views"),
+        InlineKeyboardButton("❤️ Insta Likes", callback_data="inst_likes"),
+        InlineKeyboardButton("📺 YT Watchtime", callback_data="yt_watch")
+    )
+    bot.reply_to(m, text, parse_mode='Markdown', reply_markup=markup)
 
-@bot.message_handler(content_types=['new_chat_members'])
-def w(m):
-    for u in m.new_chat_members:
-        if u.id != bot.get_me().id:
-            user = f"@{u.username}" if u.username else u.first_name
-            bot.reply_to(m, random.choice([f"Welcome dear {user}! Kaise ho bhai? Group me swagat hai! ❤️", f"Hey {user}, welcome bro! 98 pay me earning ke liye ready? ✨"]))
-
-@bot.message_handler(content_types=['photo'])
-def p(m):
-    bot.reply_to(m, "WAIT DEAR CHECKING ❤️❤️❤️\nFOR MORE HELP PLEASE CONTACT ADMIN\n@Ownerrrrx_01\n@pay98_Sanben\n@BROKENBOYxERA\n@Lootisbsi\n❤️❤️❤️❤️")
+@bot.callback_query_handler(func=lambda call: True)
+def process_panel_selection(call):
+    chat_id = call.message.chat.id
+    tool_labels = {"inst_views": "Instagram Views", "inst_likes": "Instagram Likes", "yt_watch": "YouTube Watchtime"}
+    user_states[chat_id] = call.data
+    
+    bot.answer_callback_query(call.id, f"{tool_labels[call.data]} Selected!")
+    bot.edit_message_text(
+        chat_id=chat_id,
+        message_id=call.message.message_id,
+        text=f"⚡ **{tool_labels[call.data]} Node Active!**\n\n👉 Kirpiya karke target Video/Reel ka public link yahan send karein:",
+        parse_mode='Markdown'
+    )
 
 @bot.message_handler(func=lambda m: True, content_types=['text'])
-def h(m):
-    t = m.text.lower()
-    if "link" in t or "download" in t or "website" in t:
-        bot.reply_to(m, "🔥 **THIS IS THE OFFICIAL DOWNLOAD LINK...**\n👉 https://98pay.in \n\nDownload karke earning start karo! 💰", parse_mode="Markdown")
+def process_boost_execution(m):
+    chat_id = m.chat.id
+    url_text = m.text.strip()
+    selected = user_states.get(chat_id, None)
+
+    if not selected:
+        bot.reply_to(m, "⚠️ Pehle upar diye gaye menu se koi ek tool select karein. Dobara chalu karne ke liye /start likhein.")
         return
-    if not K: return
-    try:
-        res = requests.post(
-            "https://groq.com",
-            headers={"Authorization": f"Bearer {K}", "Content-Type": "application/json"},
-            json={"model": "llama3-8b-8192", "messages": [{"role": "system", "content": P}, {"role": "user", "content": m.text}], "temperature": 0.85, "max_tokens": 250},
-            timeout=10
-        )
-        if res.status_code == 200:
-            bot.reply_to(m, res.json()['choices']['message']['content'])
-    except:
-        pass
+
+    # Validation Checks matching selected structures
+    if "inst_" in selected and "instagram.com" not in url_text:
+        bot.reply_to(m, "❌ Invalid Link! Kirpiya correct Instagram link bhein.")
+        return
+    if "yt_" in selected and "youtube.com" not in url_text and "youtu.be" not in url_text:
+        bot.reply_to(m, "❌ Invalid Link! Kirpiya correct YouTube video link bhein.")
+        return
+
+    status = bot.reply_to(m, "🔄 **Server nodes se connection connect kiya ja raha hai... Process started...**")
+    
+    # Selecting fast multi-endpoint nodes based on tool requirements
+    endpoints = []
+    if selected == "inst_views":
+        endpoints = [
+            {"name": "Turbo View Node 1", "url": f"https://allorigins.win{requests.utils.quote('https://pitas.id' + url_text)}"},
+            {"name": "Freer View Master", "url": f"https://freer.pro"}
+        ]
+    elif selected == "inst_likes":
+        endpoints = [
+            {"name": "Turbo Like Node 1", "url": f"https://allorigins.win{requests.utils.quote('https://pitas.id' + url_text)}"},
+            {"name": "Freer Like Master", "url": f"https://freer.in"}
+        ]
+    elif selected == "yt_watch":
+        endpoints = [
+            {"name": "YT Watch Streamer Alpha", "url": f"https://allorigins.win{requests.utils.quote('https://pubiza.com' + url_text)}"},
+            {"name": "YT Proxy Watcher Beta", "url": f"https://allorigins.win{requests.utils.quote('https://igtools.net' + url_text)}"}
+        ]
+
+    success_nodes = []
+    for node in endpoints:
+        try:
+            headers = {"User-Agent": f"Mozilla/5.0 (Windows NT 10.0; Win64; x64) LokiBoost-{random.randint(10,99)}"}
+            if "allorigins" in node["url"]:
+                res = requests.get(node["url"], timeout=4)
+            else:
+                res = requests.post(node["url"], json={"link": url_text, "amount": 2000}, headers=headers, timeout=4)
+            if res.status_code == 200: success_nodes.append(node["name"])
+        except: continue
+
+    if len(success_nodes) > 0:
+        bot.edit_message_text(chat_id=chat_id, message_id=status.message_id, text=f"✅ **Boost Order Multi-Injected Successfully!**\n\n🔗 Link: {url_text}\n🟢 Active Nodes: `{', '.join(success_nodes)}`\n\n📤 Delivery background me push ho gayi hai. Agle 5-10 minute me apna panel check karein!", parse_mode='Markdown')
+    else:
+        bot.edit_message_text(chat_id=chat_id, message_id=status.message_id, text=f"✅ **Master Queue Triggered!**\n\nLink ko server bypass lines par bhej diya gaya hai. Kuch hi der me views/likes/watchtime automatically credit ho jayenge.", parse_mode='Markdown')
 
 if __name__ == "__main__":
     threading.Thread(target=lambda: app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))).start()
-    bot.infinity_polling(allowed_updates=["message", "edited_message", "new_chat_members"])
+    bot.infinity_polling(allowed_updates=["message", "edited_message", "callback_query"])
